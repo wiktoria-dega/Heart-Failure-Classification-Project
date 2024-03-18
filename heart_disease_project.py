@@ -72,9 +72,23 @@ df_resampled['Cholesterol'].plot.box()
 restBP_0 = (df_resampled['RestingBP'] == 0).sum() #1 wartosc odstajaca
 chol_0 = (df_resampled['Cholesterol'] == 0).sum() #173 wartosci
 chol_over_500 = (df_resampled['Cholesterol'] > 500).sum() # 4 wartosci
+
+df['Cholesterol'].hist()
+df['Cholesterol'].median()
  
+
+df_resampled.loc[df_resampled['Cholesterol'] == 0, 'Cholesterol'] = 223
+
+#usuwanie wierszy z wartosciami 0
+#df_resampled = df_resampled[df_resampled['Cholesterol'] != 0]
+
+chol_update = (df_resampled['Cholesterol'] == 0).sum()
+
 #wyfiltrowanie outliers
 df_resampled = df_resampled[(df_resampled['RestingBP'] > 0) & (df_resampled['Cholesterol'] < 500)]
+
+#ze względu na małe korelacje - usunięcie całej kolumny
+df_resampled = df_resampled.drop('Cholesterol', axis=1)
 
 plt.figure()
 plt.title('Boxplot analizowanej ramki po odrzuceniu outliers')
@@ -90,6 +104,8 @@ corr
 
 #Macierz korelacji
 sns.heatmap(corr, annot=True)
+
+
 
 
 
