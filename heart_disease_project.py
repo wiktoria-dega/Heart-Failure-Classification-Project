@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
 from imblearn.over_sampling import SMOTE
+from pymongo import MongoClient
 
 df = pd.read_csv(r"C:\Users\Wiktoria\Desktop\Python Basics\Projekt2_Klasyfikacja\heart_data.csv")
 
@@ -104,6 +105,25 @@ corr
 
 #Macierz korelacji
 sns.heatmap(corr, annot=True)
+
+
+def save_to_db(data, database_name='heart_disease_database', collection_name='heart_data'):
+
+    client = MongoClient('mongodb://localhost:27017/')
+    db = client[database_name]
+    collection = db[collection_name] 
+    
+    
+    collection.insert_many(data)
+    
+    for doc in collection.find():   
+        print(doc)
+        
+
+#data = df_resampled.to_dict('records')
+#save_to_db(data)    
+
+
 
 
 
