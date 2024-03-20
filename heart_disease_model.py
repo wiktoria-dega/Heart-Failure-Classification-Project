@@ -14,6 +14,9 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.metrics import confusion_matrix, classification_report
+from sklearn.model_selection import GridSearchCV
+from sklearn.metrics import make_scorer, accuracy_score, precision_score, recall_score, f1_score
+
 
 
 def read_from_db(database_name='heart_disease_database', collection_name='heart_data'):
@@ -52,7 +55,7 @@ y_test.value_counts()
 #Budowa i ewaluacja modeli
 
 #Drzewo decyzyjne
-tree = DecisionTreeClassifier()
+tree = DecisionTreeClassifier(random_state=42)
 
 tree.fit(X_train_norm, y_train)
 
@@ -73,7 +76,40 @@ print('test')
 conf_test = confusion_matrix(y_test, tree_preds_test)
 print(conf_test)
 
+print('classification report')
 print(classification_report(y_test, tree_preds_test))
 
+#GridSearchCV TO DO
+params = {
+    'max_depth': [None, 3, 5, 10],
+    'min_samples_split': [2, 5, 10],
+    'min_samples_leaf': [1, 2, 5]
+    }
+
+scoring = {
+    'accuracy': make_scorer(accuracy_score, average='macro'),
+    'precision': make_scorer(precision_score, average='macro'),
+    'recall': make_scorer(recall_score, average='macro'),
+    'f1': make_scorer(f1_score, average='macro')
+    }
+
+gridSearch = GridSearchCV(tree, params, scoring=scoring, verbose=2, cv=5, refit='accuracy' )
+
+#trening
+gridSearch.fit(X_train_norm, y_train)
+
+#sprawdzenie - predykcja najlepszego modelu
+pred_best = gridSearch.best_estimator_.predict(X_test_norm)
+
+print('test - GridSearchCV')
+conf_test_gs = confusion_matrix(y_test, pred_best)
+print(conf_test_gs)
+
+print('classification report')
+print(classification_report(y_test, pred_best))
+
+print('accuracy')
+accuracy_gs = accuracy_score(y_test, pred_best)
+print(accuracy_gs)
 
 
