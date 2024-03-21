@@ -79,6 +79,10 @@ print(conf_test)
 print('classification report')
 print(classification_report(y_test, tree_preds_test))
 
+print('accuracy')
+accuracy_td = accuracy_score(y_test, tree_preds_test)
+print(accuracy_td)
+
 #GridSearchCV TO DO
 params = {
     'max_depth': [None, 3, 5, 10],
@@ -87,29 +91,43 @@ params = {
     }
 
 scoring = {
-    'accuracy': make_scorer(accuracy_score, average='macro'),
+    'accuracy': make_scorer(accuracy_score),
     'precision': make_scorer(precision_score, average='macro'),
     'recall': make_scorer(recall_score, average='macro'),
     'f1': make_scorer(f1_score, average='macro')
     }
 
-gridSearch = GridSearchCV(tree, params, scoring=scoring, verbose=2, cv=5, refit='accuracy' )
+gridSearch = GridSearchCV(tree, params, scoring=scoring, verbose=2, cv=4, refit='accuracy' )
 
 #trening
 gridSearch.fit(X_train_norm, y_train)
 
 #sprawdzenie - predykcja najlepszego modelu
-pred_best = gridSearch.best_estimator_.predict(X_test_norm)
+pred_best_train = gridSearch.best_estimator_.predict(X_train_norm)
+pred_best_test = gridSearch.best_estimator_.predict(X_test_norm)
 
-print('test - GridSearchCV')
-conf_test_gs = confusion_matrix(y_test, pred_best)
-print(conf_test_gs)
+print('train - GridSearchCV')
+conf_test_gs_train = confusion_matrix(y_train, pred_best_train)
+print(conf_test_gs_train)
 
 print('classification report')
-print(classification_report(y_test, pred_best))
+print(classification_report(y_train, pred_best_train))
 
 print('accuracy')
-accuracy_gs = accuracy_score(y_test, pred_best)
-print(accuracy_gs)
+accuracy_gs_train = accuracy_score(y_train, pred_best_train)
+print(accuracy_gs_train)
+
+
+
+print('test - GridSearchCV')
+conf_test_gs_test = confusion_matrix(y_test, pred_best_test)
+print(conf_test_gs_test)
+
+print('classification report')
+print(classification_report(y_test, pred_best_test))
+
+print('accuracy')
+accuracy_gs_test = accuracy_score(y_test, pred_best_test)
+print(accuracy_gs_test)
 
 
