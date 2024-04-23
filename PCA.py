@@ -94,7 +94,7 @@ def perform_PCA(scaled_values, n_components):
 X_transformed_from_PCA = perform_PCA(scaled_values, 19)
 
 #sprawdzenie dla 9 składowych
-X_transformed_from_PCA = perform_PCA(scaled_values, 9)
+X_transformed_from_PCA = perform_PCA(scaled_values, 10)
 
 sns.pairplot(scaled_df)
 
