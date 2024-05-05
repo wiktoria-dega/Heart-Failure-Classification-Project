@@ -1,14 +1,8 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Tue Mar 19 18:35:20 2024
-
-@author: Wiktoria
-"""
-
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
+import model_evaluation
 from pymongo import MongoClient
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MinMaxScaler
@@ -17,10 +11,16 @@ from sklearn.metrics import confusion_matrix, classification_report
 from sklearn.model_selection import GridSearchCV
 from sklearn.metrics import make_scorer, accuracy_score, precision_score, recall_score, f1_score
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import KFold, cross_val_score
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.naive_bayes import GaussianNB
+import xgboost as xgb
+import save_read_model_scaler
 
 
-
-def read_from_db(database_name='heart_disease_database', collection_name='heart_data'):
+def read_from_db(database_name='heart_disease_database', 
+                 collection_name='heart_data'):
     
     client = MongoClient('mongodb://localhost:27017/')
     db = client[database_name]
@@ -36,14 +36,17 @@ df = read_from_db()
 
 df.head()
 
-df = df.drop(columns=['_id'])
+df = df.drop(columns=['_id', 'ChestPainType_TA', 'ST_Slope_Flat',
+                      'ChestPainType_ATA', 'RestingECG_ST', 'ChestPainType_NAP',
+                      'RestingECG_LVH', 'ST_Slope_Down'])
 
 #przygotowanie danych do ML
 X = df.drop(columns=['HeartDisease'])
 y = df['HeartDisease']
 
 #podział na dane treningowe i testowe (80-20)
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=10)
+X_train, X_test, y_train, y_test = train_test_split(X, y, 
+                                                    test_size=0.2, random_state=10)
 
 #skalowanie
 min_max_scaler = MinMaxScaler()
@@ -86,8 +89,6 @@ print(accuracy_td)
 
 for i,j in zip(tree.feature_importances_, X_train.columns):
     print(i, j)
-    
-#ST_Slope_Flat i ChestPainType_TA i ChestPainType_NAP najmniej wazne
 
 #GridSearchCV TO DO
 params = {
@@ -103,13 +104,14 @@ scoring = {
     'f1': make_scorer(f1_score, average='macro')
     }
 
-gridSearch = GridSearchCV(tree, params, scoring=scoring, verbose=2, cv=4, refit='accuracy' )
+gridSearch = GridSearchCV(tree, params, scoring=scoring, 
+                          verbose=2, cv=4, refit='accuracy' )
 
 #trening
 gridSearch.fit(X_train_norm, y_train)
 
 #sprawdzenie - predykcja najlepszego modelu
-#pred_best_train = gridSearch.best_estimator_.predict(X_train_norm)
+pred_best_train = gridSearch.best_estimator_.predict(X_train_norm)
 pred_best_test = gridSearch.best_estimator_.predict(X_test_norm)
 
 print('test - GridSearchCV')
@@ -156,7 +158,8 @@ scoring_forest = {
     'f1': make_scorer(f1_score, average='macro')
     }
 
-gs_forest = GridSearchCV(rnd_forest, params_forest, scoring=scoring_forest, verbose=2, cv=4, refit='accuracy')
+gs_forest = GridSearchCV(rnd_forest, params_forest, scoring=scoring_forest, 
+                         verbose=2, cv=4, refit='accuracy')
 
 #trening
 gs_forest.fit(X_train_norm, y_train)
@@ -174,4 +177,86 @@ print(classification_report(y_test, pred_best_forest_test))
 print('accuracy')
 accuracy_test_forest_gs = accuracy_score(y_test, pred_best_forest_test)
 print(accuracy_test_forest_gs)
+
+#test funkcji z evaluate
+model_evaluation.evaluate(model = gs_forest, x = X_test_norm, y = y_test, 
+                          text = 'GridSearchCV Forest')
+
+#Regresja logistyczna
+
+modelLR = LogisticRegression()
+
+modelLR.fit(X_train_norm, y_train)
+
+#test funkcji dla modelu LR
+model_evaluation.evaluate(model = modelLR, x = X_train_norm, 
+                          y = y_train, text = 'Regresja logistyczna - train')
+model_evaluation.evaluate(model = modelLR, x = X_test_norm, 
+                          y = y_test, text = 'Regresja logistyczna - test')
+
+# CV + KNN - klasyfikator najbliższych sąsiadów
+#ustawienia kroswalidacji
+cv = KFold(n_splits=5, shuffle=True, random_state=42)
+
+max_N = 10
+mean_acc_list = []
+
+for k in range(1, max_N + 1):
+    kNN = KNeighborsClassifier(n_neighbors=k)
+    print('Model: k=', k)
+    # CV
+    knn_scores = cross_val_score(kNN, 
+                                 X_train_norm, 
+                                 y_train, 
+                                 cv=cv, 
+                                 scoring='accuracy')
+    mean_acc = knn_scores.mean()
+    mean_acc_list.append(mean_acc)
+    print(f'Srednia skutecznosc klasyfikacji kNN {mean_acc}')
+    
+    kNN.fit(X_train_norm, y_train)
+    model_evaluation.evaluate(model = kNN, 
+              x = X_test_norm, 
+              y = y_test, 
+              text = f'Model kNN, k={k}')
+    
+plt.plot(mean_acc_list)
+plt.xlabel('K')
+plt.ylabel('Mean accuracy')
+plt.title('K vs Mean accuracy')
+plt.grid()
+
+#NB
+naive = GaussianNB()
+naive.fit(X_train_norm, y_train)
+
+model_evaluation.evaluate(model = naive, x = X_train_norm, 
+                          y = y_train, text = 'NB train')
+model_evaluation.evaluate(model = naive, x = X_test_norm, 
+                          y = y_test, text = 'NB test')
+
+
+nb_scores = cross_val_score(naive, 
+                             X_train_norm, 
+                             y_train, 
+                             cv=cv, 
+                             scoring='accuracy')
+
+print(f"Srednia dokladnosc klasyfikacji NB: {nb_scores.mean()}")
+
+
+#XGBoost
+xgbc = xgb.XGBClassifier()
+xgbc.fit(X_train_norm, y_train)
+
+# Test funkcji - dla modelu LR
+model_evaluation.evaluate(model = xgbc, x = X_train_norm, y = y_train,
+                          text = 'xgbc train')
+model_evaluation.evaluate(model = xgbc, x = X_test_norm, y = y_test,
+                          text = 'xgbc test')
+
+
+#zapis modelu i scalera
+save_read_model_scaler.save_model_scaler(tree, min_max_scaler)
+
 
