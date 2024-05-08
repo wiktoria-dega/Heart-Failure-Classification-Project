@@ -40,15 +40,15 @@ df = df.drop(columns=['_id', 'ChestPainType_TA', 'ST_Slope_Flat',
                       'ChestPainType_ATA', 'RestingECG_ST', 'ChestPainType_NAP',
                       'RestingECG_LVH', 'ST_Slope_Down'])
 
-#przygotowanie danych do ML
+#preparation of data for ML
 X = df.drop(columns=['HeartDisease'])
 y = df['HeartDisease']
 
-#podział na dane treningowe i testowe (80-20)
+#split into training and test data (80-20)
 X_train, X_test, y_train, y_test = train_test_split(X, y, 
                                                     test_size=0.2, random_state=10)
 
-#skalowanie
+#scaling
 min_max_scaler = MinMaxScaler()
 
 X_train_norm = min_max_scaler.fit_transform(X_train)
@@ -56,41 +56,19 @@ X_test_norm = min_max_scaler.transform(X_test)
 
 y_test.value_counts()
 
-#Budowa i ewaluacja modeli
-
-#Drzewo decyzyjne
+#model construction and evaluation
+#decision tree model
 tree = DecisionTreeClassifier(random_state=42)
 
 tree.fit(X_train_norm, y_train)
 
-tree_preds_train = tree.predict(X_train_norm)
-tree_preds_test = tree.predict(X_test_norm)
-
-#Ocena skutecznosci
-
-#Confusion matrix (macierz pomyłek)
-
-print('train')
-conf_train = confusion_matrix(y_train, tree_preds_train)
-print(conf_train)
-
-print(classification_report(y_train, tree_preds_train))
-
-print('test')
-conf_test = confusion_matrix(y_test, tree_preds_test)
-print(conf_test)
-
-print('classification report')
-print(classification_report(y_test, tree_preds_test))
-
-print('accuracy')
-accuracy_td = accuracy_score(y_test, tree_preds_test)
-print(accuracy_td)
+model_evaluation.evaluate(tree, X_train_norm, y_train, "Decision Tree - Train")
+model_evaluation.evaluate(tree, X_test_norm, y_test, "Decision Tree - Test")
 
 for i,j in zip(tree.feature_importances_, X_train.columns):
     print(i, j)
 
-#GridSearchCV TO DO
+#decision tree by GSCV
 params = {
     'max_depth': [None, 3, 5, 10],
     'min_samples_split': [2, 5, 10],
@@ -107,43 +85,25 @@ scoring = {
 gridSearch = GridSearchCV(tree, params, scoring=scoring, 
                           verbose=2, cv=4, refit='accuracy' )
 
-#trening
+
 gridSearch.fit(X_train_norm, y_train)
 
-#sprawdzenie - predykcja najlepszego modelu
-pred_best_train = gridSearch.best_estimator_.predict(X_train_norm)
-pred_best_test = gridSearch.best_estimator_.predict(X_test_norm)
+model_evaluation.evaluate(gridSearch, X_train_norm, y_train,
+                          'Decision Tree by GridSearchCV - Train',
+                          use_best_estimator=True)
+model_evaluation.evaluate(gridSearch, X_test_norm, y_test,
+                          'Decision Tree by GridSearchCV - Test',
+                          use_best_estimator=True)
 
-print('test - GridSearchCV')
-conf_test_gs = confusion_matrix(y_test, pred_best_test)
-print(conf_test_gs)
-
-print('classification report')
-print(classification_report(y_test, pred_best_test))
-
-print('accuracy')
-accuracy_gs_test = accuracy_score(y_test, pred_best_test)
-print(accuracy_gs_test)
-
-#las losowy
+#random forest
 rnd_forest = RandomForestClassifier()
 
-#trening
 rnd_forest.fit(X_train_norm, y_train)
 
-pred_forest = rnd_forest.predict(X_test_norm)
+model_evaluation.evaluate(rnd_forest, X_train_norm, y_train, 'Random Forest - Train')
+model_evaluation.evaluate(rnd_forest, X_test_norm, y_test, 'Random Forest - Test')
 
-print('test - Random Forest')
-conf_test_forest = confusion_matrix(y_test, pred_forest)
-print(conf_test_forest)
-
-print('classification report')
-print(classification_report(y_test, pred_forest))
-
-print('accuracy')
-accuracy_test_forest = accuracy_score(y_test, pred_forest)
-print(accuracy_test_forest)
-
+#random forest by GSCV
 params_forest = {
     'n_estimators': [100, 200, 300],
     'criterion': ['gini', 'entropy'],
@@ -161,41 +121,27 @@ scoring_forest = {
 gs_forest = GridSearchCV(rnd_forest, params_forest, scoring=scoring_forest, 
                          verbose=2, cv=4, refit='accuracy')
 
-#trening
 gs_forest.fit(X_train_norm, y_train)
 
-#sprawdzenie
-pred_best_forest_test = gs_forest.best_estimator_.predict(X_test_norm)
+model_evaluation.evaluate(gs_forest, X_train_norm, y_train,
+                          'Random Forest by GridSearchCV - Train',
+                          use_best_estimator=True)
+model_evaluation.evaluate(gs_forest, X_test_norm, y_test,
+                          'Random Forest by GridSearchCV - Test',
+                          use_best_estimator=True)
 
-print('test - GridSearchCV - Forest')
-conf_test_forest_gs = confusion_matrix(y_test, pred_best_forest_test)
-print(conf_test_forest_gs)
-
-print('classification report')
-print(classification_report(y_test, pred_best_forest_test))
-
-print('accuracy')
-accuracy_test_forest_gs = accuracy_score(y_test, pred_best_forest_test)
-print(accuracy_test_forest_gs)
-
-#test funkcji z evaluate
-model_evaluation.evaluate(model = gs_forest, x = X_test_norm, y = y_test, 
-                          text = 'GridSearchCV Forest')
-
-#Regresja logistyczna
-
+#logistic regression
 modelLR = LogisticRegression()
 
 modelLR.fit(X_train_norm, y_train)
 
-#test funkcji dla modelu LR
-model_evaluation.evaluate(model = modelLR, x = X_train_norm, 
-                          y = y_train, text = 'Regresja logistyczna - train')
-model_evaluation.evaluate(model = modelLR, x = X_test_norm, 
-                          y = y_test, text = 'Regresja logistyczna - test')
+model_evaluation.evaluate(modelLR, X_train_norm, 
+                          y_train,'Logistic Regression - Train')
+model_evaluation.evaluate(modelLR, X_test_norm, 
+                          y_test,'Logistic Regression - Test')
 
-# CV + KNN - klasyfikator najbliższych sąsiadów
-#ustawienia kroswalidacji
+# CV + KNN - nearest neighbor classifier
+#crosvalidation settings
 cv = KFold(n_splits=5, shuffle=True, random_state=42)
 
 max_N = 10
@@ -212,7 +158,7 @@ for k in range(1, max_N + 1):
                                  scoring='accuracy')
     mean_acc = knn_scores.mean()
     mean_acc_list.append(mean_acc)
-    print(f'Srednia skutecznosc klasyfikacji kNN {mean_acc}')
+    print(f'Mean classification accuracy kNN {mean_acc}')
     
     kNN.fit(X_train_norm, y_train)
     model_evaluation.evaluate(model = kNN, 
@@ -226,14 +172,12 @@ plt.ylabel('Mean accuracy')
 plt.title('K vs Mean accuracy')
 plt.grid()
 
-#NB
+#naive bayes
 naive = GaussianNB()
 naive.fit(X_train_norm, y_train)
 
-model_evaluation.evaluate(model = naive, x = X_train_norm, 
-                          y = y_train, text = 'NB train')
-model_evaluation.evaluate(model = naive, x = X_test_norm, 
-                          y = y_test, text = 'NB test')
+model_evaluation.evaluate(naive, X_train_norm, y_train, 'Naive Bayes - Train')
+model_evaluation.evaluate(naive, X_test_norm, y_test, 'Naive Bayes - Test')
 
 
 nb_scores = cross_val_score(naive, 
@@ -242,21 +186,18 @@ nb_scores = cross_val_score(naive,
                              cv=cv, 
                              scoring='accuracy')
 
-print(f"Srednia dokladnosc klasyfikacji NB: {nb_scores.mean()}")
+print(f'Mean classification accuracy NB: {nb_scores.mean()}')
 
 
 #XGBoost
 xgbc = xgb.XGBClassifier()
 xgbc.fit(X_train_norm, y_train)
 
-# Test funkcji - dla modelu LR
-model_evaluation.evaluate(model = xgbc, x = X_train_norm, y = y_train,
-                          text = 'xgbc train')
-model_evaluation.evaluate(model = xgbc, x = X_test_norm, y = y_test,
-                          text = 'xgbc test')
+model_evaluation.evaluate(xgbc, X_train_norm, y_train,'XGBoost - Train')
+model_evaluation.evaluate(xgbc, X_test_norm, y_test, 'XGBoost - Test')
 
 
-#zapis modelu i scalera
+#save model and scaler
 save_read_model_scaler.save_model_scaler(tree, min_max_scaler)
 
 
